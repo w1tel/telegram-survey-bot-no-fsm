@@ -6,19 +6,15 @@ from telebot.types import ReplyKeyboardMarkup, KeyboardButton
 from dotenv import load_dotenv
 load_dotenv()
 
-
 logger = telebot.logger
 telebot.logger.setLevel(logging.INFO)
 
-
 class UserState(TypedDict):
-    step: str | None  # текущий этап («name»/«phone»/«product»)
-    data: Dict[str, str]  # накопленные ответы
+    step: str | None
+    data: Dict[str, str]  
 
-
-users: Dict[Tuple[int, int], UserState] = {}  # глобальное хранилище
+users: Dict[Tuple[int, int], UserState] = {}
 bot = telebot.TeleBot(os.getenv("TOKEN", ""))
-
 
 @bot.message_handler(commands=["start"])
 def start(message):
@@ -28,9 +24,22 @@ def start(message):
     users[key]['step'] = 'name'
     bot.send_message(chat_id=message.chat.id, text="Ваше имя")
 
+@bot.message_handler(commands=["cancel"])
+def cancel(message):
+    key = (message.chat.id, message.from_user.id)
+    if key in users:
+        users.pop(key, None)
+        bot.send_message(message.chat.id, "Опрос отменён")
+    else:
+        bot.send_message(message.chat.id, "Нет активного опроса для отмены")
+
 @bot.message_handler(content_types=["text", "contact"])
 def common_handler(message: Message):
     key = (message.chat.id, message.from_user.id)
+    if key not in users:
+        bot.send_message(message.chat.id, "Пожалуйста, начните новый опрос с помощью команды /start")
+        return
+
     if users[key]['step'] == 'name':
         users[key]["data"].update({'name': message.text})
         users[key]["step"] = 'phone'
@@ -44,25 +53,24 @@ def common_handler(message: Message):
             reply_markup=kb)
     elif users[key]["step"] == 'phone':
         contact = message.contact.phone_number
-        bot.send_message(message.chat.id, f"Спасибо! Ваш номер: {contact}")
+        bot.send_message(message.chat.id, f"Спасибо! Ваш номер: {contact}", reply_markup=telebot.types.ReplyKeyboardRemove())
         users[key]["step"] = 'product'
         users[key]["data"].update({'phone': contact})
-        bot.send_message(message.chat.id, f"Напишите чтобы вы хотели написать")
+        bot.send_message(message.chat.id, "Напишите, что бы вы хотели заказать")
     elif users[key]["step"] == 'product':
         product = message.text
         users[key]["data"].update({'product': product})
         html_text = (
         f"<b>📋 Итоги опроса:</b>\n\n"
-        f"<b>Имя:</b> {users[key]["data"]['name']}\n"
-        f"<b>Телефон:</b> {users[key]["data"]['phone']}\n"
-        f"<b>Желаемый товар:</b> {users[key]["data"]['product']}")
+        f"<b>Имя:</b> {users[key]['data']['name']}\n"
+        f"<b>Телефон:</b> {users[key]['data']['phone']}\n"
+        f"<b>Желаемый товар:</b> {users[key]['data']['product']}")
         bot.send_message(message.chat.id, html_text, parse_mode="HTML")
 
 def main():
     me = bot.get_me()
     logger.info("Бот запущен: @%s (id=%s)", me.username, me.id)
     bot.infinity_polling()
-
 
 if __name__ == "__main__":
     main()
