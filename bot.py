@@ -4,6 +4,7 @@ from typing import TypedDict, Dict, Tuple
 from telebot.types import Message
 from telebot.types import ReplyKeyboardMarkup, KeyboardButton
 from dotenv import load_dotenv
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 load_dotenv()
 
 logger = telebot.logger
@@ -65,7 +66,21 @@ def common_handler(message: Message):
         f"<b>Имя:</b> {users[key]['data']['name']}\n"
         f"<b>Телефон:</b> {users[key]['data']['phone']}\n"
         f"<b>Желаемый товар:</b> {users[key]['data']['product']}")
-        bot.send_message(message.chat.id, html_text, parse_mode="HTML")
+
+        markup = InlineKeyboardMarkup()
+        btn = InlineKeyboardButton("✅ Подтвердить", callback_data="confirm_survey")
+        markup.add(btn)
+
+        bot.send_message(message.chat.id, html_text, parse_mode="HTML", reply_markup=markup)
+
+@bot.callback_query_handler(func=lambda call: call.data == "confirm_survey")
+def handle_confirmation(call):
+    bot.answer_callback_query(call.id, "Спасибо за подтверждение!")
+    bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=None)
+    bot.send_message(call.message.chat.id, "Ваши данные сохранены. Мы свяжемся с вами при необходимости.")
+    # optionally clear user state
+    key = (call.message.chat.id, call.from_user.id)
+    users.pop(key, None)
 
 def main():
     me = bot.get_me()
