@@ -7,6 +7,7 @@ from telebot.types import ReplyKeyboardMarkup, KeyboardButton
 from dotenv import load_dotenv
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 import telebot.util
+from helpers import get_key
 
 load_dotenv()
 
@@ -23,8 +24,8 @@ ADMINS = os.getenv("ADMINS", "").split(sep=',')
 print(ADMINS)
 
 @bot.message_handler(commands=["start"])
-def start(message):
-    key = (message.chat.id, message.from_user.id)
+def start(message: Message):
+    key = get_key(message)
     if str(message.chat.id) in ADMINS:
         bot.send_message(chat_id=ADMINS[0], text='Добро пожаловать админ!')
         return
@@ -34,7 +35,7 @@ def start(message):
     print(message.chat.id)
 @bot.message_handler(commands=["cancel"])
 def cancel(message):
-    key = (message.chat.id, message.from_user.id)
+    key = get_key(message)
     if key in users:
         users.pop(key, None)
         bot.send_message(message.chat.id, "Опрос отменён")
@@ -43,7 +44,7 @@ def cancel(message):
 
 @bot.message_handler(content_types=["text", "contact"])
 def common_handler(message: Message):
-    key = (message.chat.id, message.from_user.id)
+    key = get_key(message)
     if key not in users:
         bot.send_message(message.chat.id, "Пожалуйста, начните новый опрос с помощью команды /start")
         return
@@ -95,7 +96,7 @@ def common_handler(message: Message):
 
 @bot.callback_query_handler(func=lambda call: call.data in ("confirm_survey", "edit_name"))
 def handle_callbacks(call):
-    key = (call.message.chat.id, call.from_user.id)
+    key = get_key(call)
 
     if call.data == "confirm_survey":
         bot.answer_callback_query(call.id, "Спасибо за подтверждение!")
